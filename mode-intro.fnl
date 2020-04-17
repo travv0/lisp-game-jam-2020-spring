@@ -1,4 +1,12 @@
+(local tiled (require "lib.sti"))
 (local bump (require "bump"))
+
+(fn lint [map]
+  (each [_ wall (ipairs map.layers.walls.objects)]
+    (assert wall.properties.collidable "Missing wall collidable!"))
+  map)
+
+(local map (lint (tiled "test.lua" ["bump"])))
 (local world (bump.newWorld))
 
 (local state {:player {:speed 200}
@@ -6,6 +14,7 @@
 
 (var current-key "")
 
+(: map :bump_init world)
 (: world :add state.player 50 50 32 32)
 (: world :add state.obstacle 200 50 32 32)
 
@@ -16,14 +25,14 @@
     (and (< (- box.x margin) x (+ x width) (+ (+ box.x box.width) margin))
          (< (- box.y margin) y (+ y height) (+ (+ box.y box.height) margin)))))
 
-(fn terminal-check [cols unit set-mode]
-  (set state.player.in-term? false)
+(fn wall-check [cols unit set-mode]
+  (set state.player.in-wall? false)
   (each [_ col (ipairs cols)]
-    (when (and col.other.properties col.other.properties.terminal
+    (when (and col.other.properties col.other.properties.wall
                (within? col.item col.other 0))
-      (set unit.in-term? true)
-      (when (not unit.in-term-last-tick?)
-        (set-mode :term col.other.properties.terminal)))))
+      (set unit.in-wall? true)
+      (when (not unit.in-wall-last-tick?)
+        (set-mode :wall col.other.properties.wall)))))
 
 (fn move-player [dt set-mode]
   (let [left? (if (love.keyboard.isDown "left") 1 0)
@@ -39,9 +48,10 @@
                      (- (* up? state.player.speed dt))
                      (* down? state.player.speed dt))
             (_ _ cols) (: world :move state.player new-x new-y (fn [] :slide))]
-        (terminal-check cols state.selected set-mode)))))
+        (wall-check cols state.selected set-mode)))))
 
 {:draw (fn draw [message]
+         (: map :draw)
          (love.graphics.print (: "Currently pressed key: %s"
                                :format current-key) 32 16)
          (let [(x y) (: world :getRect state.player)]
