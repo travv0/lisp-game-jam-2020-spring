@@ -65,3 +65,5 @@ uploadwindows: releases/$(NAME)-$(VERSION)-win.zip
 upload: uploadlinux uploadmac uploadwindows
 
 release: linux mac windows upload cleansrc
+
+gif: ; byzanz-record -w 640 -h 400 -d 3 out.gif
