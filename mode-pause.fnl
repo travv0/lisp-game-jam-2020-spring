@@ -5,5 +5,5 @@
          (map:draw))
  :update (fn [])
  :keypressed (fn keypressed [key set-mode]
-               (when (= key "p")
+               (when (= key "escape")
                  (set-mode "mode-game")))}

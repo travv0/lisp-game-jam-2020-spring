@@ -14,12 +14,12 @@
 (fn make-muzzle-flash [x y direction backfire]
   {:x x :y y
    :direction direction
-   :time 0.05})
+   :time 0.05
+   :backfire backfire})
 
 (fn player-shoot [player state direction]
   (let [(player-x player-y) (world:getRect player)
         dead-bugs []]
-    (table.insert state.muzzle-flashes (make-muzzle-flash player-x player-y direction))
     (each [i bug (lume.ripairs state.bugs)]
       (when (bug:exposed?)
         (let [(bug-x bug-y) (world:getRect bug)
@@ -30,8 +30,10 @@
                     (and (= direction :left) (or (>= angle (lume.angle 0 0 -1 2))
                                                  (<= angle (lume.angle 0 0 -1 -2)))))
             (table.insert dead-bugs [i bug])))))
-    (when (= (table.getn dead-bugs) 0)
-      (set player.state :dead))
+    (if (= (table.getn dead-bugs) 0)
+        (do (set player.state :dead)
+            (table.insert state.muzzle-flashes (make-muzzle-flash player-x player-y direction true)))
+        (table.insert state.muzzle-flashes (make-muzzle-flash player-x player-y direction)))
     (each [_ [i bug] (pairs dead-bugs)]
       (set state.score (+ state.score 100))
       (table.remove state.bugs i)
@@ -225,6 +227,7 @@
     (each [_ bug (pairs state.bugs)]
       (draw-bug bug player-x player-y))
     (each [_ mf (pairs state.muzzle-flashes)]
+      (love.graphics.setColor 1 1 1)
       (love.graphics.draw muzzle-flash-img
                           mf.x
                           mf.y
@@ -235,9 +238,9 @@
                               (= mf.direction :down)
                               (/ math.pi 2)
                               0)
-                          1
-                          1
-                          (* player-w -0.75)
+                          (if mf.backfire 3 1)
+                          (if mf.backfire 3 1)
+                          (if mf.backfire 0 (/ player-w -2))
                           (/ player-h 2)))))
 
 {:draw draw
@@ -256,7 +259,7 @@
              (set hi-score state.score)))
  :keypressed (fn keypressed [key set-mode]
                (if (= key "r") (re-init)
-                   (= key "p") (set-mode "mode-pause"))
+                   (= key "escape") (set-mode "mode-pause"))
                (when (not (= state.player.state :dead))
                  (if (= key "right")
                      (state.player:shoot state :right)
