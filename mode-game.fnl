@@ -11,11 +11,6 @@
 
 (local (width height) (love.window.getMode))
 
-(local down-right-angle (lume.angle 0 0 1 1))
-(local up-right-angle (lume.angle 0 0 1 -1))
-(local down-left-angle (lume.angle 0 0 -1 1))
-(local up-left-angle (lume.angle 0 0 -1 -1))
-
 (fn player-shoot [player state direction]
   (let [(player-x player-y) (world:getRect player)
         dead-bugs []]
@@ -23,11 +18,11 @@
       (when (bug:exposed?)
         (let [(bug-x bug-y) (world:getRect bug)
               angle (lume.angle player-x player-y bug-x bug-y)]
-          (when (or (and (= direction :right) (<= up-right-angle angle down-right-angle))
-                    (and (= direction :up) (<= up-left-angle angle up-right-angle))
-                    (and (= direction :down) (<= down-right-angle angle down-left-angle))
-                    (and (= direction :left) (or (>= angle down-left-angle)
-                                                 (<= angle up-left-angle))))
+          (when (or (and (= direction :right) (<= (lume.angle 0 0 1 -2) angle (lume.angle 0 0 1 2)))
+                    (and (= direction :up) (<= (lume.angle 0 0 -2 -1) angle (lume.angle 0 0 2 -1)))
+                    (and (= direction :down) (<= (lume.angle 0 0 2 1) angle (lume.angle 0 0 -2 1)))
+                    (and (= direction :left) (or (>= angle (lume.angle 0 0 -1 2))
+                                                 (<= angle (lume.angle 0 0 -1 -2)))))
             (table.insert dead-bugs [i bug])))))
     (when (= (table.getn dead-bugs) 0)
       (set player.state :dead))
@@ -175,11 +170,12 @@
                     (= bug.bug-type :bug) bug-img)]
         (love.graphics.draw img (- x (/ w 2)) (- y (/ h 2)))
         (when (bug:exposed?)
-          (love.graphics.setColor 1 1 0 0.25)
-          (love.graphics.circle :fill x y 32)
-          (love.graphics.setColor 1 0 0)
-          (love.graphics.print (: "%3.0f" :format (- bug.progress.max-hit bug.progress.current))
-                               (- x 5) (- y 5)))
+          (let [a-val (- 0.5 (/ (- bug.progress.current bug.progress.min-hit)
+                                (- bug.progress.max-hit bug.progress.min-hit)
+                                2))]
+            (love.graphics.setColor 1 1 0 a-val)
+            (love.graphics.circle :fill x y 32)
+            (love.graphics.setColor 1 0 0)))
         (when (= bug.state :shooting)
           (love.graphics.setColor 1 0 0)
           (love.graphics.line x y player-x player-y)
