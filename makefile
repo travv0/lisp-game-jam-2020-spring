@@ -1,12 +1,13 @@
 VERSION=0.1.0
 LOVE_VERSION=11.3
-NAME=change-me
-ITCH_ACCOUNT=change-me-too
-URL=https://gitlab.com/alexjgriffith/min-love2d-fennel
-AUTHOR="Your Name"
-DESCRIPTION="Minimal setup for trying out Phil Hagelberg's fennel/love game design process."
+NAME="bugs"
+ITCH_ACCOUNT=travv0
+URL=https://github.com/travv0/lisp-game-jam-2020-spring
+AUTHOR="Travis"
+DESCRIPTION="You shoot bugs with a gun."
 
 LIBS := $(wildcard lib/*)
+ASSETS := $(wildcard assets/*)
 LUA := $(wildcard *.lua)
 SRC := $(wildcard *.fnl)
 OUT := $(patsubst %.fnl,%.lua,$(SRC))
@@ -24,7 +25,7 @@ cleansrc: ; rm -rf $(OUT)
 
 LOVEFILE=releases/$(NAME)-$(VERSION).love
 
-$(LOVEFILE): $(LUA) $(OUT) $(LIBS) #assets text
+$(LOVEFILE): $(LUA) $(OUT) $(LIBS) $(ASSETS)
 	mkdir -p releases/
 	find $^ -type f | LC_ALL=C sort | env TZ=UTC zip -r -q -9 -X $@ -@
 

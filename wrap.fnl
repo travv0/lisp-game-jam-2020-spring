@@ -1,7 +1,7 @@
 (local repl (require "lib.stdio"))
 (local canvas (let [(w h) (love.window.getMode)]
                 (love.graphics.newCanvas w h)))
-(local view (require :fennelview))
+(local view (require "lib.fennelview"))
 
 (var scale 1)
 

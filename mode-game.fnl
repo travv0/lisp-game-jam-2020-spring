@@ -1,5 +1,5 @@
 (local tiled (require "lib.sti"))
-(local bump (require "bump"))
+(local bump (require "lib.bump"))
 
 (fn lint [map]
   (each [_ wall (ipairs map.layers.walls.objects)]
