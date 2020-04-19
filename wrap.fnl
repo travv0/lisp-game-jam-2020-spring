@@ -24,6 +24,10 @@
   (love.graphics.clear)
   (love.graphics.setColor 1 1 1)
   (mode.draw)
+  (let [(width height) (love.window.getMode)]
+    (love.graphics.setColor 1 1 1)
+    (love.graphics.print "Use the WASD keys to move.  When a bug glows yellow, it's vulnerable.  Press an arrow key in its direction to shoot it when it is in this state.\nDon't shoot when there are no vulnerable bugs or your gun will backfire!  Use the Esc key to pause, and the R key to restart."
+                         32 (- height 32)))
   (love.graphics.setCanvas)
   (love.graphics.setColor 1 1 1)
   (love.graphics.draw canvas 0 0 0 scale scale))
