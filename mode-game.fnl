@@ -41,7 +41,9 @@
                        :shoot player-shoot
                        :state :alive
                        :type :player
-                       :facing :right}
+                       :facing :right
+                       :shooting {:direction :right
+                                  :duration 0}}
               :obstacle {}
               :bugs []
               :score 0
@@ -65,7 +67,7 @@
 (local bug-img (love.graphics.newImage "assets/bug.png"))
 
 (fn make-progress [min-hit max-hit after speed]
-  {:current 0
+  {:current (lume.random 0 (/ min-hit 2))
    :end 100
    :min-hit min-hit
    :max-hit max-hit
@@ -96,7 +98,8 @@
              :exposed? (fn [self] (<= self.progress.min-hit
                                       self.progress.current
                                       self.progress.max-hit))
-             :shoot bug-shoot}]
+             :shoot bug-shoot
+             :angle 0}]
     (set bug.progress.parent bug)
     bug))
 
@@ -146,6 +149,7 @@
               angle (lume.angle bug-x bug-y player-x player-y)
               (dx dy) (lume.vector angle (* bug.speed dt))
               (_ _ cols) (world:move bug (+ bug-x dx) (+ bug-y dy) (fn [] :cross))]
+          (set bug.angle angle)
           (each [_ col (pairs cols)]
             (when (= col.other.type :player)
               (set col.other.state :dead)))
@@ -156,6 +160,36 @@
           (set bug.state :done)
           (set state.player.state :dead)
           (set bug.state-time 0))))))
+
+(fn bug-angle [bug]
+  (if (= bug.bug-type :bug)
+      (+ bug.angle math.pi (/ math.pi 4))
+      0))
+
+(fn bug-x-mirror [bug]
+  (if (= bug.bug-type :bug)
+      1
+      (<= (lume.angle 0 0 0 -1) bug.angle (lume.angle 0 0 0 1))
+      -1
+      1))
+
+(fn draw-bug [bug player-x player-y]
+  (let [(x y w h) (world:getRect bug)
+        img (if (= bug.bug-type :worm) worm-img
+                (= bug.bug-type :bug) bug-img)]
+    (love.graphics.draw img x y (bug-angle bug) (bug-x-mirror bug) 1 (/ w 2) (/ h 2))
+    (when (bug:exposed?)
+      (let [a-val (- 0.5 (/ (- bug.progress.current bug.progress.min-hit)
+                            (- bug.progress.max-hit bug.progress.min-hit)
+                            2))]
+        (love.graphics.setColor 1 1 0 a-val)
+        (love.graphics.circle :fill x y 32)
+        (love.graphics.setColor 1 0 0)))
+    (when (= bug.state :shooting)
+      (love.graphics.setColor 1 0 0)
+      (love.graphics.setLineWidth 5)
+      (love.graphics.line x y player-x player-y)
+      (love.graphics.setColor 1 1 1))))
 
 (fn draw [message]
   (map:draw)
@@ -175,22 +209,7 @@
                         (/ player-w 2)
                         (/ player-h 2))
     (each [_ bug (ipairs state.bugs)]
-      (let [(x y w h) (world:getRect bug)
-            img (if (= bug.bug-type :worm) worm-img
-                    (= bug.bug-type :bug) bug-img)]
-        (love.graphics.draw img x y 0 1 1 (/ w 2) (/ h 2))
-        (when (bug:exposed?)
-          (let [a-val (- 0.5 (/ (- bug.progress.current bug.progress.min-hit)
-                                (- bug.progress.max-hit bug.progress.min-hit)
-                                2))]
-            (love.graphics.setColor 1 1 0 a-val)
-            (love.graphics.circle :fill x y 32)
-            (love.graphics.setColor 1 0 0)))
-        (when (= bug.state :shooting)
-          (love.graphics.setColor 1 0 0)
-          (love.graphics.setLineWidth 5)
-          (love.graphics.line x y player-x player-y)
-          (love.graphics.setColor 1 1 1))))))
+      (draw-bug bug player-x player-y))))
 
 {:draw draw
  :update (fn update [dt set-mode]
