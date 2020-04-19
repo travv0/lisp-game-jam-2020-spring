@@ -38,6 +38,8 @@
 
 (var state {})
 
+(var hi-score 0)
+
 (fn init []
   (set state {:player {:speed 200
                        :scale 1
@@ -62,7 +64,7 @@
 
 (global s state)
 
-(local player-img (love.graphics.newImage "assets/player.png"))
+(local player-img (love.graphics.newImage "assets/playerpistol.png"))
 (local worm-img (love.graphics.newImage "assets/worm.png"))
 (local bug-img (love.graphics.newImage "assets/bug.png"))
 
@@ -161,6 +163,7 @@
 (fn draw [message]
   (map:draw)
   (love.graphics.print (: "Score: %15.0f" :format state.score) 32 16)
+  (love.graphics.print (: "High Score: %15.0f" :format hi-score) (- width 178) 16)
   (let [(player-x player-y player-w player-h) (world:getRect state.player)]
     (when (not (= state.player.state :dead))
       (love.graphics.draw player-img
@@ -170,11 +173,13 @@
       (let [(x y w h) (world:getRect bug)
             img (if (= bug.bug-type :worm) worm-img
                     (= bug.bug-type :bug) bug-img)]
-        (if (bug:exposed?)
-            (love.graphics.setColor 1 0 0)
-            (love.graphics.setColor 1 1 1))
         (love.graphics.draw img (- x (/ w 2)) (- y (/ h 2)))
-        (love.graphics.print (: "%3.0f" :format bug.progress.current) x (- y 10))
+        (when (bug:exposed?)
+          (love.graphics.setColor 1 1 0 0.25)
+          (love.graphics.circle :fill x y 32)
+          (love.graphics.setColor 1 0 0)
+          (love.graphics.print (: "%3.0f" :format (- bug.progress.max-hit bug.progress.current))
+                               (- x 5) (- y 5)))
         (when (= bug.state :shooting)
           (love.graphics.setColor 1 0 0)
           (love.graphics.line x y player-x player-y)
@@ -186,14 +191,16 @@
              (set state.score (+ state.score (* 100 dt))))
            (when (or (= (table.getn state.bugs) 0)
                      (and (not (= state.player.state :dead))
-                          (= (math.random (/ (- 2 (/ state.score 100000)) dt)) 1)))
+                          (= (math.random (/ (- 2 (/ state.score 10000)) dt)) 1)))
              (spawn-bug))
            (move-player dt set-mode)
            (when (not (= state.player.state :dead))
-             (update-bugs dt set-mode)))
+             (update-bugs dt set-mode))
+           (when (> state.score hi-score)
+             (set hi-score state.score)))
  :keypressed (fn keypressed [key set-mode]
-               (when (= key "r")
-                 (re-init))
+               (if (= key "r") (re-init)
+                   (= key "p") (set-mode "mode-pause"))
                (when (not (= state.player.state :dead))
                  (if (= key "right")
                      (state.player:shoot state :right)
