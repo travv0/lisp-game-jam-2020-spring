@@ -14,32 +14,7 @@ return {
     {
       name = "tile",
       firstgid = 1,
-      filename = "untitled.tsx",
-      tilewidth = 32,
-      tileheight = 32,
-      spacing = 0,
-      margin = 0,
-      image = "assets/tile.png",
-      imagewidth = 32,
-      imageheight = 32,
-      tileoffset = {
-        x = 0,
-        y = 0
-      },
-      grid = {
-        orientation = "orthogonal",
-        width = 32,
-        height = 32
-      },
-      properties = {},
-      terrains = {},
-      tilecount = 1,
-      tiles = {}
-    },
-    {
-      name = "tile",
-      firstgid = 2,
-      filename = "untitled.tsx",
+      filename = "tile.tsx",
       tilewidth = 32,
       tileheight = 32,
       spacing = 0,

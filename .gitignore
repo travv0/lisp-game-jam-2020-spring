@@ -1,4 +1,7 @@
 *.gif
+*.love
+wrap.lua
+mode-*.lua
 .*
 *~
 \#*
