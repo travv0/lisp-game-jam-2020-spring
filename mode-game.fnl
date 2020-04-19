@@ -11,9 +11,15 @@
 
 (local (width height) (love.window.getMode))
 
+(fn make-muzzle-flash [x y direction backfire]
+  {:x x :y y
+   :direction direction
+   :time 0.05})
+
 (fn player-shoot [player state direction]
   (let [(player-x player-y) (world:getRect player)
         dead-bugs []]
+    (table.insert state.muzzle-flashes (make-muzzle-flash player-x player-y direction))
     (each [i bug (lume.ripairs state.bugs)]
       (when (bug:exposed?)
         (let [(bug-x bug-y) (world:getRect bug)
@@ -46,6 +52,7 @@
                                   :duration 0}}
               :obstacle {}
               :bugs []
+              :muzzle-flashes []
               :score 0
               :map map
               :world world})
@@ -65,6 +72,7 @@
 (local player-img (love.graphics.newImage "assets/playerpistol.png"))
 (local worm-img (love.graphics.newImage "assets/worm.png"))
 (local bug-img (love.graphics.newImage "assets/bug.png"))
+(local muzzle-flash-img (love.graphics.newImage "assets/flash.png"))
 
 (fn make-progress [min-hit max-hit after speed]
   {:current (lume.random 0 (/ min-hit 2))
@@ -161,6 +169,12 @@
           (set state.player.state :dead)
           (set bug.state-time 0))))))
 
+(fn update-muzzle-flashes [dt set-mode]
+  (each [i mf (lume.ripairs state.muzzle-flashes)]
+    (set mf.time (- mf.time dt))
+    (when (<= mf.time 0)
+      (table.remove state.muzzle-flashes i))))
+
 (fn bug-angle [bug]
   (if (= bug.bug-type :bug)
       (+ bug.angle math.pi (/ math.pi 4))
@@ -208,8 +222,23 @@
                         1
                         (/ player-w 2)
                         (/ player-h 2))
-    (each [_ bug (ipairs state.bugs)]
-      (draw-bug bug player-x player-y))))
+    (each [_ bug (pairs state.bugs)]
+      (draw-bug bug player-x player-y))
+    (each [_ mf (pairs state.muzzle-flashes)]
+      (love.graphics.draw muzzle-flash-img
+                          mf.x
+                          mf.y
+                          (if (= mf.direction :up)
+                              (- (/ math.pi 2))
+                              (= mf.direction :left)
+                              math.pi
+                              (= mf.direction :down)
+                              (/ math.pi 2)
+                              0)
+                          1
+                          1
+                          (* player-w -0.75)
+                          (/ player-h 2)))))
 
 {:draw draw
  :update (fn update [dt set-mode]
@@ -220,6 +249,7 @@
                           (= (math.random (/ (- 2 (/ state.score 10000)) dt)) 1)))
              (spawn-bug))
            (move-player dt set-mode)
+           (update-muzzle-flashes dt set-mode)
            (when (not (= state.player.state :dead))
              (update-bugs dt set-mode))
            (when (> state.score hi-score)
