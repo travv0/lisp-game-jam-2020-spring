@@ -1,15 +1,18 @@
 (local tiled (require "lib.sti"))
 (local bump (require "lib.bump"))
 
-(fn lint [map]
-  (each [_ wall (ipairs map.layers.walls.objects)]
-    (assert wall.properties.collidable "Missing wall collidable!"))
-  map)
-
-(local map (lint (tiled "test.lua" ["bump"])))
+(local map (tiled "test.lua" ["bump"]))
 (local world (bump.newWorld))
 
 (local (width height) (love.window.getMode))
+
+(local player-img (love.graphics.newImage "assets/playerpistol.png"))
+(local dead-player-img (love.graphics.newImage "assets/deadplayer.png"))
+(local worm-img (love.graphics.newImage "assets/worm.png"))
+(local dead-worm-img (love.graphics.newImage "assets/deadworm.png"))
+(local bug-img (love.graphics.newImage "assets/bug.png"))
+(local dead-bug-img (love.graphics.newImage "assets/deadbug.png"))
+(local muzzle-flash-img (love.graphics.newImage "assets/flash.png"))
 
 (local gunshot-sound (love.audio.newSource "assets/gunshot.wav" :static))
 (local game-over-sound (love.audio.newSource "assets/gameover.wav" :static))
@@ -89,14 +92,6 @@
 
 (global s state)
 
-(local player-img (love.graphics.newImage "assets/playerpistol.png"))
-(local dead-player-img (love.graphics.newImage "assets/deadplayer.png"))
-(local worm-img (love.graphics.newImage "assets/worm.png"))
-(local dead-worm-img (love.graphics.newImage "assets/deadworm.png"))
-(local bug-img (love.graphics.newImage "assets/bug.png"))
-(local dead-bug-img (love.graphics.newImage "assets/deadbug.png"))
-(local muzzle-flash-img (love.graphics.newImage "assets/flash.png"))
-
 (fn make-progress [min-hit max-hit after speed]
   {:current (lume.random 0 (/ min-hit 2))
    :end 100
@@ -166,7 +161,7 @@
                        (- (* up? state.player.speed dt))
                        (* down? state.player.speed dt))]
           (set state.player.facing (if (< x-speed 0) :left :right))
-          (world:move state.player new-x new-y (fn [] :slide)))))))
+          (world:move state.player new-x new-y))))))
 
 (fn update-progress [dt set-mode progress]
   (set progress.current (+ progress.current (* progress.speed dt)))
@@ -230,62 +225,70 @@
                             2))]
         (love.graphics.setColor 1 1 0 a-val)
         (love.graphics.circle :fill x y 32)
-        (love.graphics.setColor 1 0 0)))
+        (love.graphics.setColor 1 1 1)))
     (when (= bug.state :shooting)
       (love.graphics.setColor 1 0 0)
       (love.graphics.setLineWidth 5)
       (love.graphics.line x y player-x player-y)
       (love.graphics.setColor 1 1 1))))
 
+(fn draw-dead-bug [bug]
+  (love.graphics.draw (if (= bug.bug-type :worm) dead-worm-img
+                          (= bug.bug-type :bug) dead-bug-img)
+                      bug.x
+                      bug.y
+                      0
+                      (if (= bug.facing :right) 1 -1)
+                      1
+                      16
+                      16))
+
+(fn draw-player [x y w h]
+  (let [img (if (= state.player.state :dead) dead-player-img player-img)]
+    (love.graphics.draw img
+                        x
+                        y
+                        0
+                        (if (= state.player.facing :right) 1 -1)
+                        1
+                        (/ w 2)
+                        (/ h 2))))
+
+(fn draw-muzzle-flashes [mf player-w player-h]
+  (love.graphics.setColor 1 1 1)
+  (love.graphics.draw muzzle-flash-img
+                      mf.x
+                      mf.y
+                      (if (= mf.direction :up)
+                          (- (/ math.pi 2))
+                          (= mf.direction :left)
+                          math.pi
+                          (= mf.direction :down)
+                          (/ math.pi 2)
+                          0)
+                      (if mf.backfire 3 1)
+                      (if mf.backfire 3 1)
+                      (if mf.backfire 0 (/ player-w -2))
+                      (/ player-h 2)))
+
 (fn draw [message]
   (map:draw)
   (love.graphics.print (: "Score: %15.0f" :format state.score) 32 16)
   (love.graphics.print (: "High Score: %15.0f" :format hi-score) (- width 178) 16)
-  (let [(player-x player-y player-w player-h) (world:getRect state.player)
-        current-player-img (if (= state.player.state :dead) dead-player-img player-img)]
+  (let [(player-x player-y player-w player-h) (world:getRect state.player)]
     (each [_ bug (pairs state.dead-bugs)]
-      (love.graphics.draw (if (= bug.bug-type :worm) dead-worm-img
-                              (= bug.bug-type :bug) dead-bug-img)
-                          bug.x
-                          bug.y
-                          0
-                          (if (= bug.facing :right) 1 -1)
-                          1
-                          16
-                          16))
-    (love.graphics.draw current-player-img
-                        player-x
-                        player-y
-                        0
-                        (if (= state.player.facing :right) 1 -1)
-                        1
-                        (/ player-w 2)
-                        (/ player-h 2))
+      (draw-dead-bug bug))
+    (draw-player player-x player-y player-w player-h)
     (each [_ bug (pairs state.bugs)]
       (draw-bug bug player-x player-y))
     (each [_ mf (pairs state.muzzle-flashes)]
-      (love.graphics.setColor 1 1 1)
-      (love.graphics.draw muzzle-flash-img
-                          mf.x
-                          mf.y
-                          (if (= mf.direction :up)
-                              (- (/ math.pi 2))
-                              (= mf.direction :left)
-                              math.pi
-                              (= mf.direction :down)
-                              (/ math.pi 2)
-                              0)
-                          (if mf.backfire 3 1)
-                          (if mf.backfire 3 1)
-                          (if mf.backfire 0 (/ player-w -2))
-                          (/ player-h 2)))))
+      (draw-muzzle-flashes mf player-w player-h))))
 
 (fn game-over []
   (game-over-sound:play)
   (set state.game-over true))
 
-{:draw draw
- :update (fn update [dt set-mode]
+(fn update [dt set-mode]
            (when (and (= state.player.state :dead)
                       (not state.game-over))
              (game-over))
@@ -300,7 +303,8 @@
            (update-bugs dt set-mode)
            (when (> state.score hi-score)
              (set hi-score state.score)))
- :keypressed (fn keypressed [key set-mode]
+
+(fn keypressed [key set-mode]
                (if (= key "r") (re-init)
                    (= key "escape") (set-mode "mode-pause"))
                (when (not (= state.player.state :dead))
@@ -311,4 +315,8 @@
                      (= key "left")
                      (state.player:shoot state :left)
                      (= key "down")
-                     (state.player:shoot state :down))))}
+                     (state.player:shoot state :down))))
+
+{:draw draw
+ :update update
+ :keypressed keypressed}
