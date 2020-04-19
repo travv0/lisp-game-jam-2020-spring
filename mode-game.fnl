@@ -40,7 +40,8 @@
                        :scale 1
                        :shoot player-shoot
                        :state :alive
-                       :type :player}
+                       :type :player
+                       :facing :right}
               :obstacle {}
               :bugs []
               :score 0
@@ -123,12 +124,13 @@
           down? (if (love.keyboard.isDown "s") 1 0)]
       (when (> (+ left? right? up? down?) 0)
         (let [(x y) (world:getRect state.player)
-              new-x (+ x
-                       (- (* left? state.player.speed dt))
-                       (* right? state.player.speed dt))
+              x-speed (+ (- (* left? state.player.speed dt))
+                         (* right? state.player.speed dt))
+              new-x (+ x x-speed)
               new-y (+ y
                        (- (* up? state.player.speed dt))
                        (* down? state.player.speed dt))]
+          (set state.player.facing (if (< x-speed 0) :left :right))
           (world:move state.player new-x new-y (fn [] :slide)))))))
 
 (fn update-progress [dt set-mode progress]
@@ -160,15 +162,23 @@
   (love.graphics.print (: "Score: %15.0f" :format state.score) 32 16)
   (love.graphics.print (: "High Score: %15.0f" :format hi-score) (- width 178) 16)
   (let [(player-x player-y player-w player-h) (world:getRect state.player)]
-    (when (not (= state.player.state :dead))
-      (love.graphics.draw player-img
-                          (- player-x (/ player-w 2))
-                          (- player-y (/ player-h 2))))
+    (love.graphics.draw player-img
+                        player-x
+                        player-y
+                        (if (= state.player.state :dead)
+                            (if (= state.player.facing :right)
+                                (- (/ math.pi 2))
+                                (/ math.pi 2))
+                            0)
+                        (if (= state.player.facing :right) 1 -1)
+                        1
+                        (/ player-w 2)
+                        (/ player-h 2))
     (each [_ bug (ipairs state.bugs)]
       (let [(x y w h) (world:getRect bug)
             img (if (= bug.bug-type :worm) worm-img
                     (= bug.bug-type :bug) bug-img)]
-        (love.graphics.draw img (- x (/ w 2)) (- y (/ h 2)))
+        (love.graphics.draw img x y 0 1 1 (/ w 2) (/ h 2))
         (when (bug:exposed?)
           (let [a-val (- 0.5 (/ (- bug.progress.current bug.progress.min-hit)
                                 (- bug.progress.max-hit bug.progress.min-hit)
@@ -178,6 +188,7 @@
             (love.graphics.setColor 1 0 0)))
         (when (= bug.state :shooting)
           (love.graphics.setColor 1 0 0)
+          (love.graphics.setLineWidth 5)
           (love.graphics.line x y player-x player-y)
           (love.graphics.setColor 1 1 1))))))
 
