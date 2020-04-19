@@ -11,6 +11,10 @@
 
 (local (width height) (love.window.getMode))
 
+(local gunshot-sound (love.audio.newSource "assets/gunshot.wav" :static))
+(local game-over-sound (love.audio.newSource "assets/gameover.wav" :static))
+(local laser-sound (love.audio.newSource "assets/laser.wav" :static))
+
 (fn make-muzzle-flash [x y direction backfire]
   {:x x :y y
    :direction direction
@@ -30,12 +34,24 @@
                     (and (= direction :left) (or (>= angle (lume.angle 0 0 -1 2))
                                                  (<= angle (lume.angle 0 0 -1 -2)))))
             (table.insert dead-bugs [i bug])))))
+    (if (= direction :left)
+        (set player.facing :left)
+        (= direction :right)
+        (set player.facing :right))
     (if (= (table.getn dead-bugs) 0)
         (do (set player.state :dead)
+            (gunshot-sound:stop)
+            (gunshot-sound:setVolume 2)
+            (gunshot-sound:play)
             (table.insert state.muzzle-flashes (make-muzzle-flash player-x player-y direction true)))
-        (table.insert state.muzzle-flashes (make-muzzle-flash player-x player-y direction)))
+        (do (gunshot-sound:stop)
+            (gunshot-sound:setVolume 1)
+            (gunshot-sound:play)
+            (table.insert state.muzzle-flashes (make-muzzle-flash player-x player-y direction))))
     (each [_ [i bug] (pairs dead-bugs)]
       (set state.score (+ state.score 100))
+      (let [(bug-x bug-y) (world:getRect bug)]
+        (table.insert state.dead-bugs {:x bug-x :y bug-y :bug-type bug.bug-type :facing bug.facing}))
       (table.remove state.bugs i)
       (world:remove bug))))
 
@@ -54,8 +70,10 @@
                                   :duration 0}}
               :obstacle {}
               :bugs []
+              :dead-bugs []
               :muzzle-flashes []
               :score 0
+              :game-over false
               :map map
               :world world})
   (map:bump_init world)
@@ -72,8 +90,11 @@
 (global s state)
 
 (local player-img (love.graphics.newImage "assets/playerpistol.png"))
+(local dead-player-img (love.graphics.newImage "assets/deadplayer.png"))
 (local worm-img (love.graphics.newImage "assets/worm.png"))
+(local dead-worm-img (love.graphics.newImage "assets/deadworm.png"))
 (local bug-img (love.graphics.newImage "assets/bug.png"))
+(local dead-bug-img (love.graphics.newImage "assets/deadbug.png"))
 (local muzzle-flash-img (love.graphics.newImage "assets/flash.png"))
 
 (fn make-progress [min-hit max-hit after speed]
@@ -109,7 +130,8 @@
                                       self.progress.current
                                       self.progress.max-hit))
              :shoot bug-shoot
-             :angle 0}]
+             :angle 0
+             :facing :right}]
     (set bug.progress.parent bug)
     bug))
 
@@ -154,21 +176,29 @@
 (fn update-bugs [dt set-mode]
   (let [(player-x player-y) (world:getRect state.player)]
     (each [_ bug (pairs state.bugs)]
-      (when (= bug.state :moving)
+      (when (and (= bug.state :moving)
+                 (not (= state.player.state :dead)))
         (let [(bug-x bug-y) (world:getRect bug)
               angle (lume.angle bug-x bug-y player-x player-y)
               (dx dy) (lume.vector angle (* bug.speed dt))
               (_ _ cols) (world:move bug (+ bug-x dx) (+ bug-y dy) (fn [] :cross))]
           (set bug.angle angle)
+          (if (<= (lume.angle 0 0 0 -1) bug.angle (lume.angle 0 0 0 1))
+              (set bug.facing :left)
+              (set bug.facing :right))
           (each [_ col (pairs cols)]
             (when (= col.other.type :player)
               (set col.other.state :dead)))
           (update-progress dt set-mode bug.progress)))
       (when (= bug.state :shooting)
+        (when (= bug.state-time 0)
+          (laser-sound:stop)
+          (laser-sound:play))
         (set bug.state-time (+ bug.state-time dt))
         (when (>= bug.state-time 1)
+          (set state.player.state :dead))
+        (when (>= bug.state-time 6)
           (set bug.state :done)
-          (set state.player.state :dead)
           (set bug.state-time 0))))))
 
 (fn update-muzzle-flashes [dt set-mode]
@@ -185,7 +215,7 @@
 (fn bug-x-mirror [bug]
   (if (= bug.bug-type :bug)
       1
-      (<= (lume.angle 0 0 0 -1) bug.angle (lume.angle 0 0 0 1))
+      (= bug.facing :left)
       -1
       1))
 
@@ -211,15 +241,22 @@
   (map:draw)
   (love.graphics.print (: "Score: %15.0f" :format state.score) 32 16)
   (love.graphics.print (: "High Score: %15.0f" :format hi-score) (- width 178) 16)
-  (let [(player-x player-y player-w player-h) (world:getRect state.player)]
-    (love.graphics.draw player-img
+  (let [(player-x player-y player-w player-h) (world:getRect state.player)
+        current-player-img (if (= state.player.state :dead) dead-player-img player-img)]
+    (each [_ bug (pairs state.dead-bugs)]
+      (love.graphics.draw (if (= bug.bug-type :worm) dead-worm-img
+                              (= bug.bug-type :bug) dead-bug-img)
+                          bug.x
+                          bug.y
+                          0
+                          (if (= bug.facing :right) 1 -1)
+                          1
+                          16
+                          16))
+    (love.graphics.draw current-player-img
                         player-x
                         player-y
-                        (if (= state.player.state :dead)
-                            (if (= state.player.facing :right)
-                                (- (/ math.pi 2))
-                                (/ math.pi 2))
-                            0)
+                        0
                         (if (= state.player.facing :right) 1 -1)
                         1
                         (/ player-w 2)
@@ -243,8 +280,15 @@
                           (if mf.backfire 0 (/ player-w -2))
                           (/ player-h 2)))))
 
+(fn game-over []
+  (game-over-sound:play)
+  (set state.game-over true))
+
 {:draw draw
  :update (fn update [dt set-mode]
+           (when (and (= state.player.state :dead)
+                      (not state.game-over))
+             (game-over))
            (when (not (= state.player.state :dead))
              (set state.score (+ state.score (* 100 dt))))
            (when (or (= (table.getn state.bugs) 0)
@@ -253,8 +297,7 @@
              (spawn-bug))
            (move-player dt set-mode)
            (update-muzzle-flashes dt set-mode)
-           (when (not (= state.player.state :dead))
-             (update-bugs dt set-mode))
+           (update-bugs dt set-mode)
            (when (> state.score hi-score)
              (set hi-score state.score)))
  :keypressed (fn keypressed [key set-mode]
