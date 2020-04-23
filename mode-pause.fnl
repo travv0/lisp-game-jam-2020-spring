@@ -1,5 +1,5 @@
 (local tiled (require "lib.sti"))
-(local map (tiled "test.lua" ["bump"]))
+(local map (tiled "tilebackground.lua" ["bump"]))
 
 {:draw (fn draw []
          (map:draw))
